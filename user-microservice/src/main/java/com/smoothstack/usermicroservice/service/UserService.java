@@ -4,17 +4,15 @@ import com.smoothstack.common.exceptions.InsufficientInformationException;
 import com.smoothstack.common.exceptions.InsufficientPasswordException;
 import com.smoothstack.common.exceptions.UserNotFoundException;
 import com.smoothstack.common.exceptions.UsernameTakenException;
-import com.smoothstack.common.models.User;
-import com.smoothstack.common.models.UserInformation;
+import com.smoothstack.common.models.*;
+import com.smoothstack.common.repositories.*;
 import com.smoothstack.usermicroservice.data.UserInformationBuild;
-import com.smoothstack.common.models.UserRole;
-import com.smoothstack.common.repositories.UserInformationRepository;
-import com.smoothstack.common.repositories.UserRepository;
 import com.smoothstack.common.services.CommonLibraryTestingService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import javax.transaction.Transactional;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -27,6 +25,21 @@ public class UserService {
 
     @Autowired
     UserInformationRepository userInformationRepository;
+
+    @Autowired
+    UserRoleRepository userRoleRepository;
+
+    @Autowired
+    CommunicationMethodRepository communicationMethodRepository;
+
+    @Autowired
+    LocationRepository locationRepository;
+
+    @Autowired
+    RestaurantRepository restaurantRepository;
+
+    @Autowired
+    ReviewRepository reviewRepository;
 
     /**
      * Returns a boolean depending on whether there is a user in the database with said username
@@ -99,13 +112,18 @@ public class UserService {
      * @param user the user to be added
      * @return the id of the created user
      */
-    public Integer createUser(User user) throws InsufficientInformationException, UsernameTakenException, InsufficientPasswordException {
+    public Integer createUser(User user, String roleName) throws InsufficientInformationException, UsernameTakenException, InsufficientPasswordException {
         if (user == null) throw new InsufficientInformationException("User not provided");
         if (user.getUserName() == null) throw new InsufficientInformationException("Username not provided");
         if (user.getPassword() == null) throw new InsufficientInformationException("Password not provided");
         if (usernameExists(user.getUserName())) throw new UsernameTakenException("Username is taken");
         if (!validPassword(user.getPassword())) throw new InsufficientPasswordException("Password is insufficient");
+        if(roleName == null) throw new RuntimeException("Role name not provided");
 
+        Optional<UserRole> optionalUserRole = userRoleRepository.findTopByRoleName(roleName);
+        if(optionalUserRole.isEmpty()) throw new RuntimeException("Role doesn't exist");
+
+        user.addRole(optionalUserRole.get());
         UserInformation newInformation = new UserInformation();
         newInformation.setUser(user);
         user.setUserInformation(newInformation);
@@ -135,7 +153,22 @@ public class UserService {
         if(userInformationBuild.getEmail() == null) throw new InsufficientInformationException("Email not provided");
         if(userInformationBuild.getPhone_number() == null) throw new InsufficientInformationException("Phone number not provided");
         if(userInformationBuild.getBirthdate() == null) throw new InsufficientInformationException("Birth date not provided");
+        if(userInformationBuild.getUserRole() == null) throw  new RuntimeException("User role not provided");
+        if(userInformationBuild.getCommunication_type_id() == null) throw new RuntimeException("Communication type id not provided");
 
+        Optional<UserRole> userRoleOptional = userRoleRepository.findTopByRoleName(userInformationBuild.getUserRole());
+        if(userRoleOptional.isPresent()) {
+            newUser.addRole(userRoleOptional.get());
+        } else {
+            throw new RuntimeException("User role doesn't exist");
+        }
+
+        Optional<CommunicationMethod> communicationMethodOptional = communicationMethodRepository.findById(userInformationBuild.getCommunication_type_id());
+        if(communicationMethodOptional.isPresent()) {
+            newUserInformation.setCommunicationType(communicationMethodOptional.get());
+        } else {
+            throw new RuntimeException("Communication Method doesn't exist");
+        }
 
         newUserInformation.setUser(newUser);
         newUser.setUserName(userInformationBuild.getUserName());
@@ -147,7 +180,6 @@ public class UserService {
         newUserInformation.setBirthdate(userInformationBuild.getBirthdate());
         newUserInformation.setVeteranStatus(userInformationBuild.getVeteran_status());
         newUserInformation.setEmailConfirmed(userInformationBuild.getEmail_confirmed());
-        newUserInformation.setCommunicationType(null);
         newUserInformation.setAccount_active(userInformationBuild.getAccount_active());
         newUser.setUserInformation(newUserInformation);
 
@@ -187,7 +219,6 @@ public class UserService {
         if (userInformationBuild.getUsers_Id() == null) throw new InsufficientInformationException("User Id not provided");
         User updateUser = getUserById(userInformationBuild.getUsers_Id());
         UserInformation updateUserInformation = userInformationRepository.getById(userInformationBuild.getUsers_Id());
-
         updateUserInformation.setUser(updateUser);
         updateUserInformation.setFirstName(userInformationBuild.getFirst_name());
         updateUserInformation.setLastName(userInformationBuild.getLast_name());
@@ -304,6 +335,7 @@ public class UserService {
      * @return
      */
     public User getLoginInfo(String username) {
+        System.out.println("here foo");
         Optional<User> foundUser = userRepository.findTopByUserName(username);
 
         if (foundUser.isPresent()) {
@@ -318,6 +350,7 @@ public class UserService {
                 List<UserRole> roles = new ArrayList<>();
 
                 for (UserRole role: user.getUserRoles()) {
+                    System.out.println(role);
                     roles.add(UserRole.builder()
                             .roleName(role.getRoleName())
                             .build()
@@ -327,9 +360,105 @@ public class UserService {
                 loginBuilder.userRoles(roles);
             }
 
+            System.out.println(loginBuilder.toString());
             return loginBuilder.build();
         }
 
         return null;
     }
+
+    public Boolean emailExists(String email) {
+        return userInformationRepository.existsByEmail(email);
+    }
+
+    public Boolean updateUserByUsername(String username, UserRole userRole) throws UserNotFoundException {
+        Optional<User> userOptional = userRepository.findTopByUserName(username);
+        if(userOptional.isPresent()) {
+            User user = userOptional.get();
+            Optional<UserRole> userRoleOptional = userRoleRepository.findTopByRoleName(userRole.getRoleName());
+            if(userRoleOptional.isPresent()) {
+                user.addRole(userRole);
+                userRepository.saveAndFlush(user);
+                return true;
+            } else {
+                throw new RuntimeException("User role doesn't exist");
+            }
+
+        } else {
+            throw new UserNotFoundException("User doesn't exist");
+        }
+    }
+
+    public UserInformationBuild getUserInformationByUsername(String username) {
+        Optional<User> user = userRepository.findTopByUserName(username);
+        User user1 = user.get();
+        Optional<UserInformation> userInformation = userInformationRepository.findById(user1.getId());
+        UserInformation userInformation1 = userInformation.get();
+        UserInformationBuild userInformationBuild = new UserInformationBuild();
+
+        userInformationBuild.setUsers_Id(user1.getId());
+        userInformationBuild.setUserName(user1.getUserName());
+        userInformationBuild.setPassword(user1.getPassword());
+        userInformationBuild.setEnabled(user1.isEnabled());
+        userInformationBuild.setFirst_name(userInformation1.getFirstName());
+        userInformationBuild.setLast_name(userInformation1.getLastName());
+        userInformationBuild.setEmail(userInformation1.getEmail());
+        userInformationBuild.setPhone_number(userInformation1.getPhoneNumber());
+        userInformationBuild.setBirthdate(userInformation1.getBirthdate());
+        userInformationBuild.setVeteran_status(userInformation1.getVeteranStatus());
+        userInformationBuild.setEmail_confirmed(userInformation1.getEmailConfirmed());
+        userInformationBuild.setAccount_active(userInformation1.getAccount_active());
+        return userInformationBuild;
+    }
+
+    public Boolean updatePassword(UserInformationBuild userInformationBuild) {
+        Optional<User> userOptional = userRepository.findTopByUserName(userInformationBuild.getUserName());
+        userOptional.get().setPassword(userInformationBuild.getPassword());
+        userRepository.saveAndFlush(userOptional.get());
+        return true;
+    }
+
+    public List<Location> getAllUsersSavedLocations(Integer userId) {
+        User user = userRepository.getById(userId);
+        return user.getSavedLocations();
+    }
+
+    @Transactional
+    public Location addUserNewSavedLocation(Integer userId, Location location) {
+        System.out.println(location.getLocationName());
+        System.out.println(location.getAddress());
+        System.out.println(location.getCity());
+        System.out.println(location.getState());
+        System.out.println(location.getZipCode());
+
+        Location newLocation = locationRepository.saveAndFlush(location);
+        User user = userRepository.getById(userId);
+        user.getSavedLocations().add(location);
+        user.setSavedLocations(user.getSavedLocations());
+        userRepository.saveAndFlush(user);
+        return newLocation;
+    }
+
+    public Boolean userReviewedRestaurant(Integer userId, Integer restaurantId) {
+        Optional<Restaurant> restaurantOptional = restaurantRepository.findById(restaurantId);
+        if(restaurantOptional.isPresent()) {
+            Review review = restaurantRepository.findByReviews_User_id(userId);
+            return (review != null) ? true:false;
+        } else {
+            throw new RuntimeException(String.format("Restaurant with Id: %d doesn't exist", restaurantId));
+        }
+    }
+
+    public List<Review> findAllUserReviews(Integer userId) {
+        Optional<User> userOptional = userRepository.findById(userId);
+        if(userOptional.isPresent()) {
+            return userOptional.get().getReviews();
+        } else {
+            throw new RuntimeException(String.format("User Id: %d does not exist"));
+        }
+    }
+
+    /*public List<Review> findAllUserRestaurantReviews(Integer userId) {
+
+    }*/
 }

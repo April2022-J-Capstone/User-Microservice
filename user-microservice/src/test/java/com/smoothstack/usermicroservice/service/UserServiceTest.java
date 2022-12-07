@@ -97,7 +97,7 @@ public class UserServiceTest {
         Integer newUserId = null;
 
         try {
-            newUserId = userService.createUser(toAdd);
+            newUserId = userService.createUser(toAdd, "admin");
         } catch (Exception e) {}
 
         assert(userService.usernameExists("newTestUser"));

@@ -28,25 +28,25 @@ public class UserControllerTest {
         User testUser1 = new User();
         testUser1.setUserName("newUser");
         testUser1.setPassword("testPassword");
-        ResponseEntity response = userController.createUser(testUser1);
+        ResponseEntity response = userController.createUser(testUser1, "admin");
         assert(response.getStatusCode().equals(HttpStatus.ACCEPTED));
 
         // Tests null user
-        response = userController.createUser(null);
+        response = userController.createUser(null, null);
         assert(response.getStatusCode().equals(HttpStatus.BAD_REQUEST));
         assert(response.getBody().equals("Could not resolve user"));
 
         // Tests null username
         User testUser2 = new User();
         testUser2.setPassword("somePassword");
-        response = userController.createUser(testUser2);
+        response = userController.createUser(testUser2, "driver");
         assert(response.getStatusCode().equals(HttpStatus.BAD_REQUEST));
         assert(response.getBody().equals("Username cannot be null"));
 
         // Tests null password
         User testUser3 = new User();
         testUser3.setUserName("testMissingPassword");
-        response = userController.createUser(testUser3);
+        response = userController.createUser(testUser3, "owner");
         assert(response.getStatusCode().equals(HttpStatus.BAD_REQUEST));
         assert(response.getBody().equals("Password cannot be null"));
 
@@ -54,7 +54,7 @@ public class UserControllerTest {
         User testUser4 = new User();
         testUser4.setUserName("newUser");
         testUser4.setPassword("somePassword");
-        response = userController.createUser(testUser4);
+        response = userController.createUser(testUser4, "manager");
         assert(response.getStatusCode().equals(HttpStatus.BAD_REQUEST));
         assert(response.getBody().equals("Username is already in use"));
     }

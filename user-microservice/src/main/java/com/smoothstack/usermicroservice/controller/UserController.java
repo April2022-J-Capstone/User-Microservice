@@ -1,8 +1,11 @@
 package com.smoothstack.usermicroservice.controller;
 
 import com.smoothstack.common.exceptions.*;
+import com.smoothstack.common.models.Location;
 import com.smoothstack.common.models.User;
 import com.smoothstack.common.models.UserInformation;
+import com.smoothstack.common.models.UserRole;
+import com.smoothstack.common.repositories.LocationRepository;
 import com.smoothstack.usermicroservice.data.UserInformationBuild;
 import com.smoothstack.usermicroservice.data.rest.ResetPasswordBody;
 import com.smoothstack.usermicroservice.data.rest.SendConfirmEmailBody;
@@ -18,7 +21,8 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@CrossOrigin(origins = "http://localhost:3000")
+@CrossOrigin("*")
+//@CrossOrigin(origins = "http://localhost:3000")
 @RequestMapping("user")
 public class UserController {
     
@@ -57,6 +61,24 @@ public class UserController {
         }
     }
 
+    @GetMapping("exists/username/{username}")
+    public ResponseEntity getUserExists(@PathVariable String username) {
+        try {
+            return ResponseEntity.ok().body(userService.usernameExists(username));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @GetMapping("exists/email/{email}")
+    public ResponseEntity getEmailExists(@PathVariable String email) {
+        try {
+            return ResponseEntity.ok().body(userService.emailExists(email));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
     /**
      * The url used to get a usersInformation
      *
@@ -74,6 +96,54 @@ public class UserController {
         return null;
     }
 
+    @GetMapping("userInformation/username/{username}")
+    public ResponseEntity getUserInformationByUsername(@PathVariable String username){
+        try {
+            return ResponseEntity.ok().body(userService.getUserInformationByUsername(username));
+        } catch(Exception e){
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @GetMapping("{userId}/locations/saved")
+    public ResponseEntity getAllUserSavedLocations(@PathVariable Integer userId) {
+        try {
+            return ResponseEntity.ok().body(userService.getAllUsersSavedLocations(userId));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @GetMapping("{userId}/reviews/restaurant/{restaurantId}/exists")
+    public ResponseEntity getUserReviewRestaurantExist(@PathVariable Integer userId, @PathVariable Integer restaurantId) {
+        try {
+            return ResponseEntity.ok().body(userService.userReviewedRestaurant(userId, restaurantId));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @GetMapping("{userId}/reviews/driver")
+    public ResponseEntity getAllUserDriverReviews(@PathVariable Integer userId) {
+        try {
+            return ResponseEntity.ok().body(userService.findAllUserReviews(userId));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+    
+    // Not finished
+    /*@GetMapping("{userId}/reviews/restaurants")
+    public ResponseEntity getAllUserRestaurantReviews(@PathVariable Integer userId) {
+        try {
+            return ResponseEntity.ok().body(userService.findAllUserRestaurantReviews(userId));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }*/
+
+
+
     @GetMapping("id/{userId}")
     public User getUserByUserId(@PathVariable(name = "userId") Integer userId) {
         //TODO
@@ -86,10 +156,10 @@ public class UserController {
      * @param user
      * @return 201 on success, 400 on invalid parameters, or 500 in case of database error
      */
-    @PostMapping(value = "create-user")
-    public ResponseEntity createUser(@RequestBody User user) {
+    @PostMapping(value = "create-user/{roleName}")
+    public ResponseEntity createUser(@RequestBody User user, @PathVariable String roleName) {
         try {
-            Integer createdId = userService.createUser(user);
+            Integer createdId = userService.createUser(user, roleName);
             return ResponseEntity.accepted().body("User created with id:" + createdId);
         } catch (InsufficientInformationException | UsernameTakenException | InsufficientPasswordException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
@@ -105,6 +175,7 @@ public class UserController {
     @PostMapping(value = "create-user-information")
     public ResponseEntity createUserInformation(@RequestBody UserInformationBuild userInformationBuild) {
         try {
+            System.out.println(userInformationBuild);
             Integer createdId = userService.createUserInformation(userInformationBuild);
             return ResponseEntity.accepted().body("User created with id:" + createdId);
         } catch (InsufficientInformationException | UsernameTakenException | InsufficientPasswordException e) {
@@ -195,6 +266,15 @@ public class UserController {
         }
     }
 
+    @PostMapping(value = "update-password")
+    public ResponseEntity updatePassword(@RequestBody UserInformationBuild userInformationBuild) {
+        try{
+            return ResponseEntity.accepted().body(userService.updatePassword(userInformationBuild));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
     @PostMapping(value = "resetPassword")
     public ResponseEntity<String> resetPassword(
             @RequestParam(name = "token") String token,
@@ -208,6 +288,24 @@ public class UserController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Password does not meet requirements");
         } catch (MsgInvalidException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Token invalid or expired");
+        }
+    }
+
+    @PostMapping(value="/{username}/add-role")
+    public ResponseEntity addUserRole(@PathVariable String username, @RequestBody UserRole userRole) {
+        try {
+            return ResponseEntity.ok().body(userService.updateUserByUsername(username, userRole));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PostMapping("{userId}/locations/saved")
+    public ResponseEntity postUserNewSavedLocation(@PathVariable Integer userId, @RequestBody Location location) {
+        try {
+            return ResponseEntity.ok().body(userService.addUserNewSavedLocation(userId, location));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 }

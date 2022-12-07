@@ -14,6 +14,7 @@
 	<name>user-microservice</name>
 	<description>User Microservice for Mega Bytes</description>
 	<properties>
+		<JWT_SECRET>shhhhhhhh</JWT_SECRET>
 		<java.version>17</java.version>
 		<spring-cloud.version>2021.0.2</spring-cloud.version>
 	</properties>
@@ -23,7 +24,7 @@
 			<groupId>com.smoothstack</groupId>
 			<artifactId>common</artifactId>
 			<version>1.0-SNAPSHOT</version>
-			<scope>provided</scope>
+			<scope>jar</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
